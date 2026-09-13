@@ -4,7 +4,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import main
 
-from core import CATEGORIES, do_backup, do_restore
+from core import CATEGORIES, do_backup, do_restore, list_backups, delete_backup, format_size
 
 
 def CwNoFound():
@@ -105,12 +105,14 @@ class RestoreTab:
         self.cw_path = cw_path
         self.frame = ttk.Frame(parent)
 
+        self.found_icon = tk.PhotoImage(file="./img/found.png")
+
         file_frame = ttk.LabelFrame(self.frame, text="选择备份文件")
         file_frame.pack(fill=tk.X, padx=10, pady=(10, 5))
 
         self.file_var = tk.StringVar()
         ttk.Entry(file_frame, textvariable=self.file_var).pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
-        ttk.Button(file_frame, text="浏览", command=self._browse_zip).pack(side=tk.RIGHT, padx=5, pady=5)
+        ttk.Button(file_frame, text="浏览…", image=self.found_icon, compound="left", command=self._browse_zip).pack(side=tk.RIGHT, padx=5, pady=5)
 
         ttk.Button(self.frame, text="开始恢复", command=self._start).pack(pady=10)
 
@@ -144,17 +146,97 @@ class RestoreTab:
         win.finish()
 
 
+class ManageTab:
+    def __init__(self, parent, cw_path):
+        self.cw_path = cw_path
+        self.frame = ttk.Frame(parent)
+
+        tree_frame = ttk.Frame(self.frame)
+        tree_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(10, 5))
+
+        columns = ("name", "size")
+        self.tree = ttk.Treeview(tree_frame, columns=columns, show="headings", selectmode="browse")
+        self.tree.heading("name", text="文件名")
+        self.tree.heading("size", text="大小")
+        self.tree.column("name", width=250)
+        self.tree.column("size", width=80)
+
+        scroll = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.tree.yview)
+        self.tree.configure(yscrollcommand=scroll.set)
+        scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        self.tree.pack(fill=tk.BOTH, expand=True)
+
+        self.delete_icon = tk.PhotoImage(file="./img/del.png")
+        self.refresh_icon = tk.PhotoImage(file="./img/refresh.png")
+        self.restore_icon = tk.PhotoImage(file="./img/restore.png")
+
+        btn_frame = ttk.Frame(self.frame)
+        btn_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
+        ttk.Button(btn_frame, text="刷新", image=self.refresh_icon, compound="left", command=self.refresh).pack(side=tk.LEFT, padx=4)
+        ttk.Button(btn_frame, text="还原", image=self.restore_icon, compound="left", command=self._restore).pack(side=tk.LEFT, padx=4)
+        ttk.Button(btn_frame, text="删除", image=self.delete_icon, compound="left", command=self._delete).pack(side=tk.LEFT, padx=4)
+
+        self.refresh()
+
+    def refresh(self):
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+        backup_dir = Path(self.cw_path) / "Backup"
+        for b in list_backups(str(backup_dir)):
+            self.tree.insert("", tk.END, values=(b["name"], format_size(b["size"])))
+
+    def _get_selected(self):
+        sel = self.tree.selection()
+        if not sel:
+            return None
+        values = self.tree.item(sel[0], "values")
+        backup_dir = Path(self.cw_path) / "Backup"
+        return str(backup_dir / values[0])
+
+    def _restore(self):
+        path = self._get_selected()
+        if not path:
+            messagebox.showwarning("Barium", "请先选择一个备份文件")
+            return
+        if not messagebox.askokcancel("Barium", "这会替换掉现有文件，被替换的文件将会被永久删除（真的非常非常久！）\n若要继续，请轻触“确定”按钮"):
+            return
+
+        win = ProgressWindow(self.frame.winfo_toplevel(), "Barium - 正在恢复")
+        win.start_thread(self._run_restore, (path, self.cw_path, win))
+
+    def _run_restore(self, zf, target, win):
+        success, error = do_restore(zf, target, win.progress_var.set, win.append_log, win.status_var.set)
+        if success:
+            win.append_log("已完成")
+        else:
+            win.append_log(f"{error}")
+        win.finish()
+
+    def _delete(self):
+        path = self._get_selected()
+        if not path:
+            messagebox.showwarning("Barium", "请先选择一个备份文件")
+            return
+        name = Path(path).name
+        if not messagebox.askokcancel("Barium", f"确定要删除备份文件 {name} 吗？"):
+            return
+        delete_backup(path)
+        self.refresh()
+
+
 class App:
     def __init__(self, root, cw_path):
         root.title(f"Barium - {main.APP_VERSION}")
-        root.geometry("400x200")
-        root.resizable(False, False)
+        root.geometry("430x340")
+        # root.resizable(False, False)
 
         notebook = ttk.Notebook(root)
         notebook.pack(fill=tk.BOTH, expand=True, padx=8, pady=8)
 
         self.backup_tab = BackupTab(notebook, cw_path)
         self.restore_tab = RestoreTab(notebook, cw_path)
+        self.manage_tab = ManageTab(notebook, cw_path)
 
         notebook.add(self.backup_tab.frame, text="备份 CW2")
         notebook.add(self.restore_tab.frame, text="恢复备份")
+        notebook.add(self.manage_tab.frame, text="管理备份")

@@ -111,6 +111,33 @@ def do_backup(src_dir, dst_dir, categories=None, on_progress=None, on_log=None, 
         return False, f"备份过程发生未知错误: {e}"
 
 
+def list_backups(backup_dir):
+    bd = Path(backup_dir)
+    if not bd.is_dir():
+        return []
+    backups = []
+    for f in sorted(bd.glob("cw2_backup_*.zip"), reverse=True):
+        size = f.stat().st_size
+        backups.append({"name": f.name, "path": str(f), "size": size})
+    return backups
+
+
+def format_size(size_bytes):
+    for unit in ("B", "KB", "MB", "GB"):
+        if size_bytes < 1024:
+            return f"{size_bytes:.1f} {unit}"
+        size_bytes /= 1024
+    return f"{size_bytes:.1f} TB"
+
+
+def delete_backup(zip_path):
+    p = Path(zip_path)
+    if p.is_file():
+        p.unlink()
+        return True
+    return False
+
+
 def do_restore(zip_path, target_dir, on_progress=None, on_log=None, on_status=None):
     def _log(msg):
         if on_log:
@@ -160,7 +187,8 @@ def do_restore(zip_path, target_dir, on_progress=None, on_log=None, on_status=No
                 if src_item.is_dir():
                     if dst_item.exists():
                         shutil.rmtree(str(dst_item))
-                    shutil.copytree(str(src_item), str(dst_item))
+                    shutil.copytree(str(src_item), str(dst_item),
+                                    ignore=shutil.ignore_patterns("Barium.exe"))
                     restored += 1
             except Exception as e:
                 shutil.rmtree(str(temp_dir), ignore_errors=True)
