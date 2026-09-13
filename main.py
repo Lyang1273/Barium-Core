@@ -1,10 +1,12 @@
 import tkinter as tk
+from tkinter import messagebox
 import argparse
 import gui
 import os
 
 
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.1.1"
+IMG_PATH = "./img"
 
 
 parser = argparse.ArgumentParser(description="Barium")

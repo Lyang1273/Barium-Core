@@ -1,3 +1,4 @@
+import sys
 import threading
 from pathlib import Path
 import tkinter as tk
@@ -5,6 +6,14 @@ from tkinter import ttk, filedialog, messagebox
 import main
 
 from core import CATEGORIES, do_backup, do_restore, list_backups, delete_backup, format_size
+
+
+def resource_path(relative_path):
+    if getattr(sys, 'frozen', False):
+        base = Path(sys._MEIPASS) if hasattr(sys, '_MEIPASS') else Path(sys.argv[0]).parent
+    else:
+        base = Path(__file__).parent
+    return str(base / relative_path)
 
 
 def CwNoFound():
@@ -105,7 +114,7 @@ class RestoreTab:
         self.cw_path = cw_path
         self.frame = ttk.Frame(parent)
 
-        self.found_icon = tk.PhotoImage(file="./img/found.png")
+        self.found_icon = tk.PhotoImage(file=resource_path("img/found.png"))
 
         file_frame = ttk.LabelFrame(self.frame, text="选择备份文件")
         file_frame.pack(fill=tk.X, padx=10, pady=(10, 5))
@@ -166,9 +175,9 @@ class ManageTab:
         scroll.pack(side=tk.RIGHT, fill=tk.Y)
         self.tree.pack(fill=tk.BOTH, expand=True)
 
-        self.delete_icon = tk.PhotoImage(file="./img/del.png")
-        self.refresh_icon = tk.PhotoImage(file="./img/refresh.png")
-        self.restore_icon = tk.PhotoImage(file="./img/restore.png")
+        self.delete_icon = tk.PhotoImage(file=resource_path("img/del.png"))
+        self.refresh_icon = tk.PhotoImage(file=resource_path("img/refresh.png"))
+        self.restore_icon = tk.PhotoImage(file=resource_path("img/restore.png"))
 
         btn_frame = ttk.Frame(self.frame)
         btn_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
